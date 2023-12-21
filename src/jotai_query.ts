@@ -67,27 +67,32 @@ export function createQueryAtom<T, E = unknown, P = unknown>(
     const { params, enable = false } = options;
     const [queryResult, setQueryResult] = useAtom(queryResultAtom);
 
-    const isFirstFetching = useRef(true);
+    const firstFetched = useRef(false);
+
+    // 最後一個請求的標記
+    const lastFetched = useRef<symbol | null>(null);
 
     const paramsRef = useRef(params);
     paramsRef.current = params;
 
     const paramsKey = getKey(params);
 
-    const refetch = useCallback(
-      () =>
-        Promise.resolve(
-          setQueryResult({
-            status: 'loading',
-            isIdle: false,
-            isLoading: true,
-            isSuccess: false,
-            isError: false,
-            isInvalidated: false,
-          })
-        )
-          .then(() => fn(paramsRef.current))
-          .then((res) =>
+    const refetch = useCallback(() => {
+      const currentFetchSymbol = Symbol();
+      lastFetched.current = currentFetchSymbol;
+      return Promise.resolve(
+        setQueryResult({
+          status: 'loading',
+          isIdle: false,
+          isLoading: true,
+          isSuccess: false,
+          isError: false,
+          isInvalidated: false,
+        })
+      )
+        .then(() => fn(paramsRef.current))
+        .then((res) => {
+          if (currentFetchSymbol === lastFetched.current) {
             setQueryResult({
               status: 'success',
               isIdle: false,
@@ -96,9 +101,11 @@ export function createQueryAtom<T, E = unknown, P = unknown>(
               isError: false,
               data: res,
               isInvalidated: false,
-            })
-          )
-          .catch((err: E) =>
+            });
+          }
+        })
+        .catch((err: E) => {
+          if (currentFetchSymbol === lastFetched.current) {
             setQueryResult({
               status: 'error',
               isIdle: false,
@@ -107,36 +114,33 @@ export function createQueryAtom<T, E = unknown, P = unknown>(
               isError: true,
               error: err,
               isInvalidated: false,
-            })
-          ),
-      [setQueryResult]
-    );
+            });
+          }
+        })
+        .finally(() => (firstFetched.current = true));
+    }, [setQueryResult]);
 
     useEffect(() => {
       if (
-        isFirstFetching.current &&
-        ((enable && queryResult.status === 'idle') ||
-          (queryResult.status === 'idle' && queryResult.error !== undefined))
+        !firstFetched.current &&
+        (enable || (queryResult.status === 'idle' && queryResult.error !== undefined))
       ) {
         console.log('enable fetching');
-        refetch().finally(() => (isFirstFetching.current = false));
+        refetch();
       }
     }, [enable, queryResult.status, queryResult.error, refetch]);
 
     useEffect(() => {
-      if (!isFirstFetching.current && queryResult.status !== 'loading') {
+      if (firstFetched.current) {
         console.log('key change fetching');
         refetch();
       }
     }, [paramsKey, refetch]);
 
     useEffect(() => {
-      if (queryResult.isInvalidated && queryResult.status !== 'loading') {
+      if (queryResult.isInvalidated && firstFetched.current) {
         console.log('invalidate fetching');
         refetch();
-      }
-      if (queryResult.isInvalidated) {
-        setQueryResult((prev) => ({ ...prev, isInvalidated: false }));
       }
     }, [queryResult.isInvalidated, queryResult.status, refetch, setQueryResult]);
 

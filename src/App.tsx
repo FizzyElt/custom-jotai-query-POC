@@ -1,17 +1,21 @@
-import { useState } from 'react';
 import { ScopeProvider } from 'jotai-scope';
 import { listResultAtom } from './query';
 import DemoPage from './DemoPage';
+import { QueryClientProvider } from '@tanstack/react-query';
+import ReactQueryDemoPage, { queryClient } from './ReactQueryDemoPage';
+
 function App() {
-  const [enable, setEnable] = useState(true);
   return (
     <>
-      <button onClick={() => setEnable(!enable)}>toggle</button>
-      {enable && (
+      <div>
         <ScopeProvider atoms={[listResultAtom]}>
           <DemoPage />
         </ScopeProvider>
-      )}
+
+        <QueryClientProvider client={queryClient}>
+          <ReactQueryDemoPage />
+        </QueryClientProvider>
+      </div>
     </>
   );
 }
