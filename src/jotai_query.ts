@@ -45,7 +45,7 @@ type QueryResult<T, E = unknown> =
     };
 
 export function createQueryAtom<T, E = unknown, P = unknown>(
-  fn: (p: P) => Promise<T>,
+  fn: (params: P) => Promise<T>,
   getParamsKey: (p: P) => string | number | null = () => null
 ) {
   const queryResultAtom = atom<QueryResult<T, E>>({
@@ -202,10 +202,19 @@ export const createInvalidatedAtom = (atoms: PrimitiveAtom<QueryResult<any, any>
     atoms.forEach((atom) => set(atom, (prev) => ({ ...prev, isInvalidated: true })))
   );
 
+const emptyInvalidateAtom = createInvalidatedAtom([]);
+
 export function useMutation<T, E, P>(
   fn: (p: P) => Promise<T>,
-  setQueryAtoms: WritableAtom<null, [], void>
+  options?: {
+    onSuccess?: (data: T) => void;
+    onError?: (err: E) => void;
+    onSettled?: (data: T | undefined, err: E | null) => void;
+    invalidateAtom?: WritableAtom<null, [], void>;
+  }
 ) {
+  const { onSuccess, onError, onSettled, invalidateAtom = emptyInvalidateAtom } = options || {};
+
   const [mutationState, setMutationState] = useState<MutationResult<T, E>>({
     status: 'idle',
     isLoading: false,
@@ -214,10 +223,17 @@ export function useMutation<T, E, P>(
     isError: false,
   });
 
-  const invalidateQuery = useSetAtom(setQueryAtoms);
+  const invalidateQuery = useSetAtom(invalidateAtom);
 
   const mutate = useCallback(
-    (p: P) => {
+    (
+      p: P,
+      options: {
+        onSuccess?: (data: T) => void;
+        onError?: (err: E) => void;
+        onSettled?: (data: T | undefined, err: E | null) => void;
+      } = {}
+    ) => {
       fn(p)
         .then((data) => {
           setMutationState({
@@ -228,6 +244,10 @@ export function useMutation<T, E, P>(
             isError: false,
             data,
           });
+          onSuccess?.(data);
+          onSettled?.(data, null);
+          options?.onSuccess?.(data);
+          options?.onSettled?.(data, null);
           invalidateQuery();
         })
         .catch((err: E) => {
@@ -239,9 +259,13 @@ export function useMutation<T, E, P>(
             isError: true,
             error: err,
           });
+          onError?.(err);
+          onSettled?.(undefined, err);
+          options?.onError?.(err);
+          options?.onSettled?.(undefined, err);
         });
     },
-    [invalidateQuery, fn]
+    [invalidateQuery, fn, onSettled, onError, onSuccess]
   );
 
   return {

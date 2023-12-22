@@ -1,4 +1,4 @@
-import { createQueryAtom,createInvalidatedAtom } from './jotai_query';
+import { createQueryAtom, createInvalidatedAtom } from './jotai_query';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -9,5 +9,4 @@ export const getList = (params: { count: number }) =>
 
 export const [listResultAtom, useList] = createQueryAtom(getList, (p) => p.count);
 
-
-export const invalidateListAtom = createInvalidatedAtom([listResultAtom])
+export const invalidateListAtom = createInvalidatedAtom([listResultAtom]);
