@@ -142,7 +142,7 @@ export function createQueryAtom<T, E = unknown, P = unknown>(
         console.log('invalidate fetching');
         refetch();
       }
-    }, [queryResult.isInvalidated, queryResult.status, refetch, setQueryResult]);
+    }, [queryResult.isInvalidated, refetch]);
 
     useEffect(
       () =>
