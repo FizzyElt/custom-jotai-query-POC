@@ -145,7 +145,7 @@ export function createQueryAtom<T, E = unknown, P = unknown>(
     }, [queryResult.isInvalidated, refetch]);
 
     useEffect(
-      () =>
+      () => () =>
         setQueryResult((prev) =>
           prev.status === 'error' ? { ...prev, status: 'idle', isIdle: true, isError: false } : prev
         ),
